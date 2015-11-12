@@ -10,6 +10,16 @@
 # NOTE: if we need to only archive some topics, use this setting:
 #   secor.kafka.topic_filter=.*
 
+# Convert Heroku env vars for Kafka into ones compatible with secor. These come in in the format of:
+# zookeeper://10.1.54.249:2181,zookeeper://10.1.104.244:2181,zookeeper://10.1.66.173:2181
+# and
+# kafka://10.1.16.157:6667,kafka://10.1.0.165:6667,kafka://10.1.50.155:6667
+ZOOKEEPER="${HEROKU_KAFKA_ZOOKEEPER_URL//zookeeper:\/\/}"
+KAFKA="${HEROKU_KAFKA_URL//kafka:\/\//}"
+ONE_KAFKA="${KAFKA%%,*}"
+KAFKA_HOST="${ONE_KAFKA%:*}"
+KAFKA_PORT="${ONE_KAFKA#*:}"
+
 java -ea \
   -Daws.access.key=$AWS_ACCESS_KEY_ID \
   -Daws.secret.key=$AWS_SECRET_ACCESS_KEY\
