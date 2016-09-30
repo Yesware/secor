@@ -26,20 +26,36 @@ import com.pinterest.secor.common.SecorConfig;
 public class FileUtilTest {
 
     private SecorConfig mSwiftConfig;
-    private SecorConfig mS3Config;
+    private SecorConfig mS3AConfig;
+    private SecorConfig mS3NConfig;
+    private SecorConfig mGSconfig;
 
     @Before
     public void setUp() throws Exception {
         mSwiftConfig = Mockito.mock(SecorConfig.class);
         Mockito.when(mSwiftConfig.getCloudService()).thenReturn("Swift");
-        Mockito.when(mSwiftConfig.getSeperateContainersForTopics()).thenReturn(false);
+        Mockito.when(mSwiftConfig.getSeparateContainersForTopics()).thenReturn(false);
         Mockito.when(mSwiftConfig.getSwiftContainer()).thenReturn("some_container");
         Mockito.when(mSwiftConfig.getSwiftPath()).thenReturn("some_swift_parent_dir");
 
-        mS3Config = Mockito.mock(SecorConfig.class);
-        Mockito.when(mS3Config.getCloudService()).thenReturn("S3");
-        Mockito.when(mS3Config.getS3Bucket()).thenReturn("some_bucket");
-        Mockito.when(mS3Config.getS3Path()).thenReturn("some_s3_parent_dir"); 
+        mS3AConfig = Mockito.mock(SecorConfig.class);
+        Mockito.when(mS3AConfig.getCloudService()).thenReturn("S3");
+        Mockito.when(mS3AConfig.getS3FileSystem()).thenReturn("s3a");
+        Mockito.when(mS3AConfig.getS3Bucket()).thenReturn("some_bucket");
+        Mockito.when(mS3AConfig.getS3Path()).thenReturn("some_s3_parent_dir");
+        Mockito.when(mS3AConfig.getS3Prefix()).thenCallRealMethod();
+
+        mS3NConfig = Mockito.mock(SecorConfig.class);
+        Mockito.when(mS3NConfig.getCloudService()).thenReturn("S3");
+        Mockito.when(mS3NConfig.getS3FileSystem()).thenReturn("s3n");
+        Mockito.when(mS3NConfig.getS3Bucket()).thenReturn("some_bucket");
+        Mockito.when(mS3NConfig.getS3Path()).thenReturn("some_s3_parent_dir");
+        Mockito.when(mS3NConfig.getS3Prefix()).thenCallRealMethod();
+
+        mGSconfig = Mockito.mock(SecorConfig.class);
+        Mockito.when(mGSconfig.getCloudService()).thenReturn("GS");
+        Mockito.when(mGSconfig.getGsBucket()).thenReturn("some_gs_bucket");
+        Mockito.when(mGSconfig.getGsPath()).thenReturn("some_gs_parent_dir");
     }
 
     @Test
@@ -48,9 +64,17 @@ public class FileUtilTest {
         Assert.assertEquals(FileUtil.getPrefix("some_topic", mSwiftConfig),
                 "swift://some_container.GENERICPROJECT/some_swift_parent_dir");
 
-        //FileUtil.configure(mS3Config);
-        Assert.assertEquals(FileUtil.getPrefix("some_topic", mS3Config),
+        //FileUtil.configure(mS3AConfig);
+        Assert.assertEquals(FileUtil.getPrefix("some_topic", mS3AConfig),
+                "s3a://some_bucket/some_s3_parent_dir");
+
+        //FileUtil.configure(mS3NConfig);
+        Assert.assertEquals(FileUtil.getPrefix("some_topic", mS3NConfig),
                 "s3n://some_bucket/some_s3_parent_dir");
+
+        //FileUtil.configure(mGSConfig);
+        Assert.assertEquals(FileUtil.getPrefix("some_topic", mGSconfig),
+                "gs://some_gs_bucket/some_gs_parent_dir");
 
         // return to the previous state
         FileUtil.configure(null);

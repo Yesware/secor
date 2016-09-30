@@ -21,14 +21,18 @@ import com.pinterest.secor.common.SecorConfig;
 import com.pinterest.secor.parser.MessageParser;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.junit.Test;
+import org.junit.Before;
 
 public class ReflectionUtilTest {
 
     private SecorConfig mSecorConfig;
     private LogFilePath mLogFilePath;
 
+    @Before
     public void setUp() throws Exception {
         PropertiesConfiguration properties = new PropertiesConfiguration();
+        properties.addProperty("message.timestamp.name","");
+        properties.addProperty("message.timestamp.name.separator","");
         mSecorConfig = new SecorConfig(properties);
         mLogFilePath = new LogFilePath("/foo", "/foo/bar/baz/1_1_1");
     }
@@ -46,7 +50,7 @@ public class ReflectionUtilTest {
 
     @Test(expected = ClassNotFoundException.class)
     public void testFileWriterClassNotFound() throws Exception {
-        ReflectionUtil.createFileWriter("com.example.foo", mLogFilePath, null);
+        ReflectionUtil.createFileWriter("com.example.foo", mLogFilePath, null, mSecorConfig);
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -62,6 +66,6 @@ public class ReflectionUtilTest {
         // Try to create a message parser using an existent and available class, but one not
         // assignable to MessageParser
         ReflectionUtil.createFileWriter("java.lang.Object",
-                mLogFilePath, null);
+                mLogFilePath, null, mSecorConfig);
     }
 }

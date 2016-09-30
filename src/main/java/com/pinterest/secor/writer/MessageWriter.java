@@ -58,9 +58,13 @@ public class MessageWriter {
         if (mConfig.getCompressionCodec() != null && !mConfig.getCompressionCodec().isEmpty()) {
             mCodec = CompressionUtil.createCompressionCodec(mConfig.getCompressionCodec());
             mFileExtension = mCodec.getDefaultExtension();
-        } else {
+        }
+        if (mConfig.getFileExtension() != null && !mConfig.getFileExtension().isEmpty()) {
+            mFileExtension = mConfig.getFileExtension();
+        } else if (mFileExtension == null){
             mFileExtension = "";
         }
+        
         mLocalPrefix = mConfig.getLocalPath() + '/' + IdUtil.getLocalMessageDir();
         mGeneration = mConfig.getGeneration();
     }
@@ -88,7 +92,7 @@ public class MessageWriter {
         LogFilePath path = new LogFilePath(mLocalPrefix, mGeneration, offset, message,
         		mFileExtension);
         FileWriter writer = mFileRegistry.getOrCreateWriter(path, mCodec);
-        writer.write(new KeyValue(message.getOffset(), message.getPayload()));
+        writer.write(new KeyValue(message.getOffset(), message.getKafkaKey(), message.getPayload()));
         LOG.debug("appended message {} to file {}.  File length {}",
                   message, path, writer.getLength());
     }

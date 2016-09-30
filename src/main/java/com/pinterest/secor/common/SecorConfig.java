@@ -16,12 +16,16 @@
  */
 package com.pinterest.secor.common;
 
+import com.google.api.client.repackaged.com.google.common.base.Strings;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.configuration.PropertiesConfiguration;
 import org.apache.commons.lang.StringUtils;
 
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Properties;
+import java.util.TimeZone;
 
 /**
  * One-stop shop for Secor configuration options.
@@ -103,7 +107,7 @@ public class SecorConfig {
         return getString("kafka.fetch.message.max.bytes");
     }
 
-    public String getSocketReceieveBufferBytes() {
+    public String getSocketReceiveBufferBytes() {
         return getString("kafka.socket.receive.buffer.bytes");
     }
 
@@ -113,6 +117,14 @@ public class SecorConfig {
 
     public String getFetchWaitMaxMs() {
         return getString("kafka.fetch.wait.max.ms");
+    }
+
+    public String getDualCommitEnabled() {
+        return getString("kafka.dual.commit.enabled");
+    }
+
+    public String getOffsetsStorage() {
+        return getString("kafka.offsets.storage");
     }
 
     public int getGeneration() {
@@ -141,7 +153,7 @@ public class SecorConfig {
 
     public String getS3FileSystem() { return getString("secor.s3.filesystem"); }
 
-    public boolean getSeperateContainersForTopics() {
+    public boolean getSeparateContainersForTopics() {
     	return getString("secor.swift.containers.for.each.topic").toLowerCase().equals("true");
     }
     
@@ -161,9 +173,18 @@ public class SecorConfig {
         return getString("secor.s3.path");
     }
 
+    public String getS3AlternativePath() {
+        return getString("secor.s3.alternative.path");
+    }
+
+    public String getS3AlterPathDate() {
+        return getString("secor.s3.alter.path.date");
+    }
+
     public String getS3Prefix() {
         return getS3FileSystem() + "://" + getS3Bucket() + "/" + getS3Path();
     }
+
     public String getLocalPath() {
         return getString("secor.local.path");
     }
@@ -171,6 +192,14 @@ public class SecorConfig {
     public String getKafkaTopicFilter() {
         return getString("secor.kafka.topic_filter");
     }
+
+    public String getKafkaTopicBlacklist() {
+        return getString("secor.kafka.topic_blacklist");
+    }
+
+    public String getKafkaTopicUploadAtMinuteMarkFilter() { return getString("secor.kafka.upload_at_minute_mark.topic_filter");}
+
+    public int getUploadMinuteMark(){ return getInt("secor.upload.minute_mark");}
 
     public String getKafkaGroup() {
         return getString("secor.kafka.group");
@@ -188,10 +217,18 @@ public class SecorConfig {
         return getString("secor.message.parser.class");
     }
 
+    public String getUploaderClass() {
+        return getString("secor.upload.class", "com.pinterest.secor.uploader.Uploader");
+    }
+
     public String getUploadManagerClass() {
         return getString("secor.upload.manager.class");
     }
 
+    public String getMessageTransformerClass(){
+    	return getString("secor.message.transformer.class");
+    }
+ 
     public int getTopicPartitionForgetSeconds() {
         return getInt("secor.topic_partition.forget.seconds");
     }
@@ -224,8 +261,36 @@ public class SecorConfig {
         return getString("aws.endpoint");
     }
 
+    public String getAwsRole() {
+        return getString("aws.role");
+    }
+    
+    public boolean getAwsProxyEnabled(){
+    	return getBoolean("aws.proxy.isEnabled");
+    }
+    
+    public String getAwsProxyHttpHost() {
+        return getString("aws.proxy.http.host");
+    }
+    
+    public int getAwsProxyHttpPort() {
+        return getInt("aws.proxy.http.port");
+    }
+
     public String getAwsRegion() {
         return getString("aws.region");
+    }
+
+    public String getAwsSseType() {
+        return getString("aws.sse.type");
+    }
+
+    public String getAwsSseKmsKey() {
+        return getString("aws.sse.kms.key");
+    }
+
+    public String getAwsSseCustomerKey() {
+        return getString("aws.sse.customer.key");
     }
 
     public String getSwiftTenant() {
@@ -283,9 +348,25 @@ public class SecorConfig {
     public String getMessageTimestampName() {
         return getString("message.timestamp.name");
     }
+    
+    public String getMessageTimestampNameSeparator() {
+        return getString("message.timestamp.name.separator");
+    }
+
+    public int getMessageTimestampId() {
+        return getInt("message.timestamp.id");
+    }
+
+    public String getMessageTimestampType() {
+        return getString("message.timestamp.type");
+    }
 
     public String getMessageTimestampInputPattern() {
         return getString("message.timestamp.input.pattern");
+    }
+
+    public boolean isMessageTimestampRequired() {
+        return mProperties.getBoolean("message.timestamp.required");
     }
 
     public int getFinalizerLookbackPeriods() {
@@ -294,6 +375,11 @@ public class SecorConfig {
 
     public String getHivePrefix() { 
         return getString("secor.hive.prefix"); 
+    }
+
+    public String getHiveTableName(String topic) {
+        String key = "secor.hive.table.name." + topic;
+        return mProperties.getString(key, null);
     }
 
     public String getCompressionCodec() {
@@ -336,36 +422,83 @@ public class SecorConfig {
         return getInt("secor.gs.read.timeout.ms", 3 * 60000);
     }
 
+    public boolean getGsDirectUpload() {
+        return getBoolean("secor.gs.upload.direct");
+    }
+
+    public int getFinalizerDelaySeconds() {
+        return getInt("partitioner.finalizer.delay.seconds");
+    }
+
+    public boolean getS3MD5HashPrefix() {
+      return getBoolean("secor.s3.prefix.md5hash");
+    }
+
+    public String getAzureEndpointsProtocol() { return getString("secor.azure.endpoints.protocol"); }
+
+    public String getAzureAccountName() { return getString("secor.azure.account.name"); }
+
+    public String getAzureAccountKey() { return getString("secor.azure.account.key"); }
+
+    public String getAzureContainer() { return getString("secor.azure.container.name"); }
+
+    public String getAzurePath() { return getString("secor.azure.path"); }
+    
+    public Map<String, String> getProtobufMessageClassPerTopic() {
+        String prefix = "secor.protobuf.message.class";
+        Iterator<String> keys = mProperties.getKeys(prefix);
+        Map<String, String> protobufClasses = new HashMap<String, String>();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            String className = mProperties.getString(key);
+            protobufClasses.put(key.substring(prefix.length() + 1), className);
+        }
+        return protobufClasses;
+    }
+    
+    public TimeZone getTimeZone() {
+        String timezone = getString("secor.parser.timezone");
+        return Strings.isNullOrEmpty(timezone) ? TimeZone.getTimeZone("UTC") : TimeZone.getTimeZone(timezone);
+    }
+
     public boolean getBoolean(String name, boolean defaultValue) {
         return mProperties.getBoolean(name, defaultValue);
     }
+    
+    public boolean getBoolean(String name) {
+        return mProperties.getBoolean(name);
+    }
 
-    private void checkProperty(String name) {
+    public void checkProperty(String name) {
         if (!mProperties.containsKey(name)) {
             throw new RuntimeException("Failed to find required configuration option '" +
                                        name + "'.");
         }
     }
 
-    private String getString(String name) {
+    public String getString(String name) {
         checkProperty(name);
         return mProperties.getString(name);
     }
 
-    private int getInt(String name) {
+    public String getString(String name, String defaultValue) {
+        return mProperties.getString(name, defaultValue);
+    }
+
+    public int getInt(String name) {
         checkProperty(name);
         return mProperties.getInt(name);
     }
 
-    private int getInt(String name, int defaultValue) {
+    public int getInt(String name, int defaultValue) {
         return mProperties.getInt(name, defaultValue);
     }
 
-    private long getLong(String name) {
+    public long getLong(String name) {
         return mProperties.getLong(name);
     }
 
-    private String[] getStringArray(String name) {
+    public String[] getStringArray(String name) {
         return mProperties.getStringArray(name);
     }
 }

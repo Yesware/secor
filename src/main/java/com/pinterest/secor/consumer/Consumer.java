@@ -22,6 +22,7 @@ import com.pinterest.secor.common.SecorConfig;
 import com.pinterest.secor.message.Message;
 import com.pinterest.secor.message.ParsedMessage;
 import com.pinterest.secor.parser.MessageParser;
+import com.pinterest.secor.transformer.MessageTransformer;
 import com.pinterest.secor.uploader.Uploader;
 import com.pinterest.secor.uploader.UploadManager;
 import com.pinterest.secor.reader.MessageReader;
@@ -55,6 +56,7 @@ public class Consumer extends Thread {
     private MessageWriter mMessageWriter;
     private MessageParser mMessageParser;
     private OffsetTracker mOffsetTracker;
+    private MessageTransformer mMessageTransformer;
     private Uploader mUploader;
     // TODO(pawel): we should keep a count per topic partition.
     private double mUnparsableMessages;
@@ -69,9 +71,11 @@ public class Consumer extends Thread {
         FileRegistry fileRegistry = new FileRegistry(mConfig);
         UploadManager uploadManager = ReflectionUtil.createUploadManager(mConfig.getUploadManagerClass(), mConfig);
 
-        mUploader = new Uploader(mConfig, mOffsetTracker, fileRegistry, uploadManager);
+        mUploader = ReflectionUtil.createUploader(mConfig.getUploaderClass());
+        mUploader.init(mConfig, mOffsetTracker, fileRegistry, uploadManager);
         mMessageWriter = new MessageWriter(mConfig, mOffsetTracker, fileRegistry);
         mMessageParser = ReflectionUtil.createMessageParser(mConfig.getMessageParserClass(), mConfig);
+        mMessageTransformer =  ReflectionUtil.createMessageTransformer(mConfig.getMessageTransformerClass(), mConfig);
         mUnparsableMessages = 0.;
     }
 
@@ -136,10 +140,11 @@ public class Consumer extends Thread {
             }
             ParsedMessage parsedMessage = null;
             try {
-                parsedMessage = mMessageParser.parse(rawMessage);
+                Message transformedMessage = mMessageTransformer.transform(rawMessage);
+                parsedMessage = mMessageParser.parse(transformedMessage);
                 final double DECAY = 0.999;
                 mUnparsableMessages *= DECAY;
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 mUnparsableMessages++;
                 final double MAX_UNPARSABLE_MESSAGES = 1000.;
                 if (mUnparsableMessages > MAX_UNPARSABLE_MESSAGES) {
@@ -162,12 +167,9 @@ public class Consumer extends Thread {
     /**
      * Helper to get the offset tracker (used in tests)
      * 
-     * @param topic
-     * @param partition
-     * @return
+     * @return the offset tracker
      */
     public OffsetTracker getOffsetTracker() {
         return this.mOffsetTracker;
     }
-		
 }

@@ -16,18 +16,30 @@
  */
 package com.pinterest.secor.util;
 
-import com.pinterest.secor.common.SecorConfig;
+import java.io.File;
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URI;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Date;
+
+import java.text.SimpleDateFormat;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.lang3.StringUtils;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.s3a.Constants;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3a.Constants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.IOException;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
+import com.pinterest.secor.common.SecorConfig;
 
 /**
  * File util implements utilities for interactions with the file system.
@@ -35,12 +47,16 @@ import java.util.Arrays;
  * @author Pawel Garbacki (pawel@pinterest.com)
  */
 public class FileUtil {
+    private static final Logger LOG = LoggerFactory.getLogger(FileUtil.class);
     private static Configuration mConf = new Configuration(true);
+    private static final char[] m_digits = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a',
+        'b', 'c', 'd', 'e', 'f'};
+    private static final Pattern datePattern = Pattern.compile(".*dt=(\\d\\d\\d\\d-\\d\\d-\\d\\d).*");
 
     public static void configure(SecorConfig config) {
         if (config != null) {
-            if (config.getCloudService().equals("Swift")){
-                mConf.set("fs.swift.impl","org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem");
+            if (config.getCloudService().equals("Swift")) {
+                mConf.set("fs.swift.impl", "org.apache.hadoop.fs.swift.snative.SwiftNativeFileSystem");
                 mConf.set("fs.swift.service.GENERICPROJECT.auth.url", config.getSwiftAuthUrl());
                 mConf.set("fs.swift.service.GENERICPROJECT.username", config.getSwiftUsername());
                 mConf.set("fs.swift.service.GENERICPROJECT.tenant", config.getSwiftTenant());
@@ -52,7 +68,7 @@ public class FileUtil {
                 } else {
                     mConf.set("fs.swift.service.GENERICPROJECT.password", config.getSwiftPassword());
                 }
-            } else {
+            } else if (config.getCloudService().equals("S3")) {
                 if (config.getAwsAccessKey().isEmpty() != config.getAwsSecretKey().isEmpty()) {
                     throw new IllegalArgumentException(
                         "Must specify both aws.access.key and aws.secret.key or neither.");
@@ -71,11 +87,44 @@ public class FileUtil {
         return FileSystem.get(URI.create(path), mConf);
     }
 
+    public static boolean s3PathPrefixIsAltered(String logFileName, SecorConfig config)
+                                                        throws Exception {
+        Date logDate = null;
+        if (config.getS3AlterPathDate() != null && !config.getS3AlterPathDate().isEmpty()) {
+
+            Date s3AlterPathDate = new SimpleDateFormat("yyyy-MM-dd").parse(config.getS3AlterPathDate());
+
+            // logFileName contains the log path, e.g. raw_logs/secor_topic/dt=2016-04-20/3_0_0000000000000292564
+            Matcher dateMatcher = datePattern.matcher(logFileName);
+            if (dateMatcher.find()) {
+                logDate = new SimpleDateFormat("yyyy-MM-dd").parse(dateMatcher.group(1));
+            }
+
+            if (logDate == null) {
+                throw new Exception("Did not find a date in the format yyyy-MM-dd in " + logFileName);
+            }
+
+            if (!s3AlterPathDate.after(logDate)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static String getS3AlternativePathPrefix(SecorConfig config) {
+        return config.getS3AlternativePath();
+    }
+
+    public static String getS3AlternativePrefix(SecorConfig config) {
+        return config.getS3FileSystem() + "://" + config.getS3Bucket() + "/" + config.getS3AlternativePath();
+    }
+
     public static String getPrefix(String topic, SecorConfig config)  throws IOException {
         String prefix = null;
         if (config.getCloudService().equals("Swift")) {
             String container = null;
-            if (config.getSeperateContainersForTopics()) {
+            if (config.getSeparateContainersForTopics()) {
                 if (!exists("swift://" + topic + ".GENERICPROJECT")){
                     String containerUrl = "swift://" + topic + ".GENERICPROJECT";
                     Path containerPath = new Path(containerUrl);
@@ -86,12 +135,15 @@ public class FileUtil {
                 container = config.getSwiftContainer();
             }
             prefix = "swift://" + container + ".GENERICPROJECT/" + config.getSwiftPath();
-        } else {
-            prefix = "s3n://" + config.getS3Bucket() + "/" + config.getS3Path();
+        } else if (config.getCloudService().equals("S3")) {
+                prefix = config.getS3Prefix();
+        } else if (config.getCloudService().equals("GS")) {
+            prefix = "gs://" + config.getGsBucket() + "/" + config.getGsPath();
+        } else if (config.getCloudService().equals("Azure")) {
+            prefix = "azure://" + config.getAzureContainer() + "/" + config.getAzurePath();
         }
         return prefix;
     }
-
 
     public static String[] list(String path) throws IOException {
         FileSystem fs = getFileSystem(path);
@@ -101,7 +153,8 @@ public class FileUtil {
         if (statuses != null) {
             for (FileStatus status : statuses) {
                 Path statusPath = status.getPath();
-                if (path.startsWith("s3://") || path.startsWith("s3n://") || path.startsWith("s3a://") || path.startsWith("swift://")) {
+                if (path.startsWith("s3://") || path.startsWith("s3n://") || path.startsWith("s3a://") ||
+                        path.startsWith("swift://") || path.startsWith("gs://")) {
                     paths.add(statusPath.toUri().toString());
                 } else {
                     paths.add(statusPath.toUri().getPath());
@@ -169,7 +222,8 @@ public class FileUtil {
             for (FileStatus fileStatus : statuses) {
                 Path statusPath = fileStatus.getPath();
                 String stringPath;
-                if (path.startsWith("s3://") || path.startsWith("s3n://") || path.startsWith("s3a://") || path.startsWith("swift://")) {
+                if (path.startsWith("s3://") || path.startsWith("s3n://") || path.startsWith("s3a://") ||
+                        path.startsWith("swift://") || path.startsWith("gs://")) {
                     stringPath = statusPath.toUri().toString();
                 } else {
                     stringPath = statusPath.toUri().getPath();
@@ -181,5 +235,40 @@ public class FileUtil {
             }
         }
         return modificationTime;
+    }
+    
+    /** Generate MD5 hash of topic and partitions. And extract first 4 characters of the MD5 hash.
+     * @param topic
+     * @param partitions
+     * @return
+     */
+    public static String getMd5Hash(String topic, String[] partitions) {
+      ArrayList<String> elements = new ArrayList<String>();
+      elements.add(topic);
+      for (String partition : partitions) {
+        elements.add(partition);
+      }
+      String pathPrefix = StringUtils.join(elements, "/");
+      try {
+        final MessageDigest messageDigest = MessageDigest.getInstance("MD5");
+        byte[] md5Bytes = messageDigest.digest(pathPrefix.getBytes("UTF-8"));
+        return getHexEncode(md5Bytes).substring(0, 4);
+      } catch (NoSuchAlgorithmException e) {
+        LOG.error(e.getMessage());
+      } catch (UnsupportedEncodingException e) {
+        LOG.error(e.getMessage());
+      }
+      return "";
+    }
+
+    private static String getHexEncode(byte[] bytes) {
+      final char[] chars = new char[bytes.length * 2];
+      for (int i = 0; i < bytes.length; ++i) {
+        final int cx = i * 2;
+        final byte b = bytes[i];
+        chars[cx] = m_digits[(b & 0xf0) >> 4];
+        chars[cx + 1] = m_digits[(b & 0x0f)];
+      }
+      return new String(chars);
     }
 }
