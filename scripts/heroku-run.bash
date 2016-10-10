@@ -15,7 +15,7 @@
 # and
 # kafka://10.1.16.157:6667,kafka://10.1.0.165:6667,kafka://10.1.50.155:6667
 ZOOKEEPER="${HEROKU_KAFKA_ZOOKEEPER_URL//zookeeper:\/\/}"
-KAFKA="${HEROKU_KAFKA_URL//kafka:\/\//}"
+KAFKA="${HEROKU_KAFKA_PLAINTEXT_URL//kafka:\/\//}"
 ONE_KAFKA="${KAFKA%%,*}"
 KAFKA_HOST="${ONE_KAFKA%:*}"
 KAFKA_PORT="${ONE_KAFKA#*:}"
