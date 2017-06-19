@@ -59,6 +59,7 @@ public class ZookeeperConnector {
     }
 
     private Iterable<InetSocketAddress> getZookeeperAddresses() {
+        LOG.debug("ZOOKEEPER: getZookeeperAddresses");
         String zookeeperQuorum = mConfig.getZookeeperQuorum();
         String[] hostports = zookeeperQuorum.split(",");
         LinkedList<InetSocketAddress> result = new LinkedList<InetSocketAddress>();
@@ -69,6 +70,7 @@ public class ZookeeperConnector {
             int port = Integer.parseInt(elements[1]);
             result.add(new InetSocketAddress(host, port));
         }
+        LOG.debug("ZOOKEEPER: getZookeeperAddresses result [ {} ]", result);
         return result;
     }
 
@@ -77,6 +79,7 @@ public class ZookeeperConnector {
         DistributedLock distributedLock = new DistributedLockImpl(mZookeeperClient, lockPath);
         mLocks.put(lockPath, distributedLock);
         distributedLock.lock();
+        LOG.debug("ZOOKEEPER: lock  {}", lockPath);
     }
 
     public void unlock(String lockPath) {
@@ -84,6 +87,7 @@ public class ZookeeperConnector {
         assert distributedLock != null: "mLocks.get(" + lockPath + ") != null";
         distributedLock.unlock();
         mLocks.remove(lockPath);
+        LOG.debug("ZOOKEEPER: unlock  {}", lockPath);
     }
 
     protected String getCommittedOffsetGroupPath() {
@@ -97,24 +101,30 @@ public class ZookeeperConnector {
                     "offsets"
             );
         }
+        LOG.debug("ZOOKEEPER: getCommittedOffsetGroupPath  {}", mCommittedOffsetGroupPath);
         return mCommittedOffsetGroupPath;
     }
 
     private String getCommittedOffsetTopicPath(String topic) {
+        LOG.debug("ZOOKEEPER: getCommittedOffsetTopicPath  {}", topic);
         return getCommittedOffsetGroupPath() + "/" + topic;
     }
 
     private String getCommittedOffsetPartitionPath(TopicPartition topicPartition) {
+        LOG.debug("ZOOKEEPER: getCommittedOffsetPartitionPath  {}", topicPartition);
         return getCommittedOffsetTopicPath(topicPartition.getTopic()) + "/" +
             topicPartition.getPartition();
     }
 
     public long getCommittedOffsetCount(TopicPartition topicPartition) throws Exception {
+        LOG.debug("ZOOKEEPER: getCommittedOffsetCount  {}", topicPartition);
         ZooKeeper zookeeper = mZookeeperClient.get();
         String offsetPath = getCommittedOffsetPartitionPath(topicPartition);
         try {
             byte[] data = zookeeper.getData(offsetPath, false, null);
-            return Long.parseLong(new String(data));
+            Long offsetCount  =  Long.parseLong(new String(data));
+            LOG.debug("ZOOKEEPER: getCommittedOffsetCount result {}", offsetCount);
+            return offsetCount;
         } catch (KeeperException.NoNodeException exception) {
             LOG.warn("path {} does not exist in zookeeper", offsetPath);
             return -1;
@@ -122,6 +132,7 @@ public class ZookeeperConnector {
     }
 
     public List<Integer> getCommittedOffsetPartitions(String topic) throws Exception {
+        LOG.debug("ZOOKEEPER: getCommittedOffsetPartitions {}", topic);
         ZooKeeper zookeeper = mZookeeperClient.get();
         String topicPath = getCommittedOffsetTopicPath(topic);
         List<String> partitions = zookeeper.getChildren(topicPath, false);
@@ -131,10 +142,12 @@ public class ZookeeperConnector {
             String partition = elements[elements.length - 1];
             result.add(Integer.valueOf(partition));
         }
+        LOG.debug("ZOOKEEPER: getCommittedOffsetPartitions  {} = {}", topic, result);
         return result;
     }
 
     public List<String> getCommittedOffsetTopics() throws Exception {
+        LOG.debug("ZOOKEEPER: getCommittedOffsetTopics");
         ZooKeeper zookeeper = mZookeeperClient.get();
         String offsetPath = getCommittedOffsetGroupPath();
         List<String> topics = zookeeper.getChildren(offsetPath, false);
@@ -144,10 +157,12 @@ public class ZookeeperConnector {
             String topic = elements[elements.length - 1];
             result.add(topic);
         }
+        LOG.debug("ZOOKEEPER: getCommittedOffsetTopics  = {}", result);
         return result;
     }
 
     private void createMissingParents(String path) throws Exception {
+        LOG.debug("ZOOKEEPER: createMissingParents {}", path);
         ZooKeeper zookeeper = mZookeeperClient.get();
         assert path.charAt(0) == '/': path + ".charAt(0) == '/'";
         String[] elements = path.split("/");
@@ -158,6 +173,7 @@ public class ZookeeperConnector {
                 zookeeper.create(prefix, null, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 LOG.info("created path {}", prefix);
             } catch (KeeperException.NodeExistsException exception) {
+                LOG.warn("ZOOKEEPER: createMissingParents {}", exception);
             }
         }
     }
@@ -165,6 +181,7 @@ public class ZookeeperConnector {
     public void setCommittedOffsetCount(TopicPartition topicPartition, long count)
             throws Exception {
         ZooKeeper zookeeper = mZookeeperClient.get();
+        LOG.debug("ZOOKEEPER: setCommittedOffsetCount {} , {}", topicPartition, count);
         String offsetPath = getCommittedOffsetPartitionPath(topicPartition);
         LOG.info("creating missing parents for zookeeper path {}", offsetPath);
         createMissingParents(offsetPath);
@@ -174,12 +191,14 @@ public class ZookeeperConnector {
             // -1 matches any version
             zookeeper.setData(offsetPath, data, -1);
         } catch (KeeperException.NoNodeException exception) {
+            LOG.warn("ZOOKEEPER: setCommittedOffsetCount {}", exception);
             zookeeper.create(offsetPath, data, ZooDefs.Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         }
     }
 
     public void deleteCommittedOffsetTopicCount(String topic) throws Exception {
         ZooKeeper zookeeper = mZookeeperClient.get();
+        LOG.debug("ZOOKEEPER: deleteCommittedOffsetTopicCount {}", topic);
         List<Integer> partitions = getCommittedOffsetPartitions(topic);
         for (Integer partition : partitions) {
             TopicPartition topicPartition = new TopicPartition(topic, partition);
@@ -193,6 +212,7 @@ public class ZookeeperConnector {
             throws Exception {
         String offsetPath = getCommittedOffsetPartitionPath(topicPartition);
         ZooKeeper zookeeper = mZookeeperClient.get();
+        LOG.debug("ZOOKEEPER: deleteCommittedOffsetPartitionCount {}", topicPartition);
         LOG.info("deleting path {}", offsetPath);
         zookeeper.delete(offsetPath, -1);
     }
