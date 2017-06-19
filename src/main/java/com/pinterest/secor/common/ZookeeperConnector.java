@@ -113,7 +113,7 @@ public class ZookeeperConnector {
     private String getCommittedOffsetPartitionPath(TopicPartition topicPartition) {
         LOG.debug("ZOOKEEPER: getCommittedOffsetPartitionPath  {}", topicPartition);
         return getCommittedOffsetTopicPath(topicPartition.getTopic()) + "/" +
-            topicPartition.getPartition();
+                topicPartition.getPartition();
     }
 
     public long getCommittedOffsetCount(TopicPartition topicPartition) throws Exception {

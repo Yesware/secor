@@ -44,6 +44,7 @@ public class HadoopS3UploadManager extends UploadManager {
     }
 
     public Handle<?> upload(LogFilePath localPath) throws Exception {
+        LOG.debug("TESTING: upload {}", localPath);
         String prefix = FileUtil.getPrefix(localPath.getTopic(), mConfig);
         LogFilePath path = localPath.withPrefix(prefix);
         final String localLogFilename = localPath.getLogFilePath();

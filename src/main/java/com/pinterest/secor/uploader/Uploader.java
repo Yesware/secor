@@ -182,6 +182,7 @@ public class Uploader {
             long newOffsetCount = mZookeeperConnector.getCommittedOffsetCount(topicPartition);
             long oldOffsetCount = mOffsetTracker.setCommittedOffsetCount(topicPartition,
                     newOffsetCount);
+            LOG.debug("UPLOADER: checkTopicPartition, newOffsetCount={}, lastSeenOffset={}", newOffsetCount, lastSeenOffset);
             long lastSeenOffset = mOffsetTracker.getLastSeenOffset(topicPartition);
             if (oldOffsetCount == newOffsetCount) {
                 LOG.debug("Uploading for: " + topicPartition);
@@ -204,6 +205,7 @@ public class Uploader {
     }
 
     public void applyPolicy() throws Exception {
+        LOG.debug("UPLOADER: applyPolicy");
         Collection<TopicPartition> topicPartitions = mFileRegistry.getTopicPartitions();
         for (TopicPartition topicPartition : topicPartitions) {
             checkTopicPartition(topicPartition);

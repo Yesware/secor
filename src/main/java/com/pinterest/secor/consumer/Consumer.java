@@ -106,6 +106,7 @@ public class Consumer extends Thread {
     }
 
     private void checkUploadPolicy() {
+        LOG.debug("CONSUMER: checkUploadPolicy");
         try {
             mUploader.applyPolicy();
         } catch (Exception e) {
