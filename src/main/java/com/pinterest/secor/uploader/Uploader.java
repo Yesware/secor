@@ -176,12 +176,14 @@ public class Uploader {
     private void checkTopicPartition(TopicPartition topicPartition) throws Exception {
         final long size = mFileRegistry.getSize(topicPartition);
         final long modificationAgeSec = mFileRegistry.getModificationAgeSec(topicPartition);
+        topicPartition
         LOG.debug("size: " + size + " modificationAge: " + modificationAgeSec);
         if (size >= mConfig.getMaxFileSizeBytes() ||
                 modificationAgeSec >= mConfig.getMaxFileAgeSeconds()) {
             long newOffsetCount = mZookeeperConnector.getCommittedOffsetCount(topicPartition);
             long oldOffsetCount = mOffsetTracker.setCommittedOffsetCount(topicPartition,
                     newOffsetCount);
+            LOG.debug("UPLOADER: checkTopicPartition, newOffsetCount={}, lastSeenOffset={}", newOffsetCount, lastSeenOffset);
             long lastSeenOffset = mOffsetTracker.getLastSeenOffset(topicPartition);
             if (oldOffsetCount == newOffsetCount) {
                 LOG.debug("Uploading for: " + topicPartition);
@@ -204,6 +206,7 @@ public class Uploader {
     }
 
     public void applyPolicy() throws Exception {
+        LOG.debug("UPLOADER: applyPolicy");
         Collection<TopicPartition> topicPartitions = mFileRegistry.getTopicPartitions();
         for (TopicPartition topicPartition : topicPartitions) {
             checkTopicPartition(topicPartition);
