@@ -129,7 +129,7 @@ public class Consumer extends Thread {
         } catch (ConsumerTimeoutException e) {
             // We wait for a new message with a timeout to periodically apply the upload policy
             // even if no messages are delivered.
-            LOG.trace("Consumer timed out", e);
+            LOG.debug("Consumer timed out", e);
         }
         if (rawMessage != null) {
             // Before parsing, update the offset and remove any redundant data
