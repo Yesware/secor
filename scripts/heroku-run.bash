@@ -46,6 +46,7 @@ function putS3
 }
 
 java -ea \
+  -Xms2400m -Xmx2400m
   -Daws.access.key=$AWS_ACCESS_KEY_ID \
   -Daws.secret.key=$AWS_SECRET_ACCESS_KEY\
   -Dzookeeper.quorum=$ZOOKEEPER \

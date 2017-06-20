@@ -77,6 +77,7 @@ public class ConsumerMain {
             for (Consumer consumer : consumers) {
                 consumer.join();
             }
+            LOG.info("Threads completed, exiting.");
         } catch (Throwable t) {
             LOG.error("Consumer failed", t);
             System.exit(1);
