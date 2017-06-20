@@ -92,6 +92,7 @@ public class Consumer extends Thread {
         while (true) {
             boolean hasMoreMessages = consumeNextMessage();
             if (!hasMoreMessages) {
+                LOG.debug("CONSUMER: hasMoreMessages = {}", hasMoreMessages);
                 break;
             }
 
@@ -102,6 +103,7 @@ public class Consumer extends Thread {
                 checkUploadPolicy();
             }
         }
+        LOG.debug("CONSUMER: run() ending.");
         checkUploadPolicy();
     }
 
@@ -120,6 +122,7 @@ public class Consumer extends Thread {
         try {
             boolean hasNext = mMessageReader.hasNext();
             if (!hasNext) {
+                LOG.debug("CONSUMER: mMessageReader.hasNext() = {}", hasNext);
                 return false;
             }
             rawMessage = mMessageReader.read();
