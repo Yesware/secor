@@ -182,8 +182,8 @@ public class Uploader {
             long newOffsetCount = mZookeeperConnector.getCommittedOffsetCount(topicPartition);
             long oldOffsetCount = mOffsetTracker.setCommittedOffsetCount(topicPartition,
                     newOffsetCount);
-            LOG.debug("UPLOADER: checkTopicPartition, newOffsetCount={}, lastSeenOffset={}", newOffsetCount, lastSeenOffset);
             long lastSeenOffset = mOffsetTracker.getLastSeenOffset(topicPartition);
+            LOG.debug("UPLOADER: checkTopicPartition, newOffsetCount={}, lastSeenOffset={}", newOffsetCount, lastSeenOffset);
             if (oldOffsetCount == newOffsetCount) {
                 LOG.debug("Uploading for: " + topicPartition);
                 uploadFiles(topicPartition);
