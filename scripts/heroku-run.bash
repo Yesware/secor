@@ -20,6 +20,31 @@ ONE_KAFKA="${KAFKA%%,*}"
 KAFKA_HOST="${ONE_KAFKA%:*}"
 KAFKA_PORT="${ONE_KAFKA#*:}"
 
+S3KEY=$LOG_AWS_KEY
+S3SECRET=$LOG_AWS_SECRET
+
+function putS3
+{
+  path=$1
+  file=$2
+  aws_path=$3
+  bucket='barry-allen-crash-files'
+  date=$(date +"%a, %d %b %Y %T %z")
+  acl="x-amz-acl:public-read"
+  content_type='text/plain'
+  string="PUT\n\n$content_type\n$date\n$acl\n/$bucket$aws_path$file"
+  signature=$(echo -en "${string}" | openssl sha1 -hmac "${S3SECRET}" -binary | base64)
+  fsize=$(stat -c '%s' $file)
+  curl --verbose -X PUT -T "$path./$file" \
+    -H "Host: $bucket.s3.amazonaws.com" \
+    -H "Date: $date" \
+    -H "Content-Type: $content_type" \
+    -H "Content-Length: $fsize" \
+    -H "$acl" \
+    -H "Authorization: AWS ${S3KEY}:$signature" \
+    "https://$bucket.s3.amazonaws.com$aws_path$file"
+}
+
 java -ea \
   -Daws.access.key=$AWS_ACCESS_KEY_ID \
   -Daws.secret.key=$AWS_SECRET_ACCESS_KEY\
@@ -38,3 +63,8 @@ java -ea \
   -Dconfig=secor.prod.partition.properties \
   -cp target/classes:target/lib/* \
   com.pinterest.secor.main.ConsumerMain
+
+
+for file in "$path"./hs*.log; do
+	putS3 "$path" "${file##*/}" "/"
+done
