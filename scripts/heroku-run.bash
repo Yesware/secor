@@ -46,9 +46,8 @@ function putS3
 }
 
 java -ea \
-  -Xms2400m -Xmx2400m
   -Daws.access.key=$AWS_ACCESS_KEY_ID \
-  -Daws.secret.key=$AWS_SECRET_ACCESS_KEY\
+  -Daws.secret.key=$AWS_SECRET_ACCESS_KEY \
   -Dzookeeper.quorum=$ZOOKEEPER \
   -Dsecor.s3.bucket=$S3_BUCKET \
   -Dsecor.max.file.size.bytes=$MAX_FILE_SIZE_BYTES \
